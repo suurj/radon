@@ -1,6 +1,6 @@
 # 2D Radon transform and 3D John transform matrices
 The first Julia code constructs a discrete 2D Radon transform operator matrix by a raycasting method, when a function is approximated with
-linear triangular shape functions, i.e, it works with an unstructured mesh.  The function _test_ calculates a sinogram for Shepp–Logan using the file  _phantom.mat_. The example mesh consists of 137155 shape functions and 273052 elements. 
+linear triangular shape functions, i.e. it works with an unstructured mesh.  The function _test_ calculates a sinogram for Shepp–Logan using the file  _phantom.mat_. The example mesh consists of 137155 shape functions and 273052 elements. 
 
 On the other hand, the second code uses raycasting to construct a discrete 3D John transform  matrix in a structured mesh of voxels. The test function calculates projections for a simple ellipsoid. 
 
