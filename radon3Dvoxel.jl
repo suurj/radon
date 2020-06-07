@@ -181,6 +181,7 @@ function setupvoxels(sizex::Int64,sizey::Int64,sizez::Int64,octsize::Int64)
 end
 
 
+#https://gdbooks.gitbooks.io/3dcollisions/content/Chapter2/static_aabb_plane.html
 @inline @inbounds function intersects(
     p::plane3d,
     b::HyperRectangle{3,Float64})
@@ -194,7 +195,7 @@ end
 
 end
 
-@inbounds @inline function planeintegal(p::plane3d,h::HyperRectangle{3,Float64})::Float64
+@inbounds @inline function planeintegal(p::plane3d,h::HyperRectangle{3,Float64})::Float64
     e = Vector{segment3d{SArray{Tuple{3},Float64,1,3}}}(undef,12)
     e[1] = segment3d(SVector(h.origin),@SVector[h.widths[1],0,0])
     e[2] = segment3d(SVector(h.origin),@SVector[0,h.widths[2],0])
