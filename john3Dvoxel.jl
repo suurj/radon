@@ -114,7 +114,7 @@ function inserttotree!(
     return nothing
 end
 
-function possiblevoxels(r::Union{ray3d,ray2d}, tree::Cell)::Vector{Int64}
+function possiblevoxels(r::ray3d, tree::Cell)::Vector{Int64}
     if (isleaf(tree) && intersects(r, tree.boundary) > 0.0)
         return tree.data
 
@@ -146,14 +146,15 @@ function voxelray(
     checklist::Vector{Int64},
 )
     N = length(checklist)
-    tlens = Vector{Float64}(undef, N)
+    indices = Vector{Int64}()
+    tlens = Vector{Float64}()
     for i = 1:N
         q = intersects(r, vv[checklist[i]])
-        tlens[i] = q
+        if (q>0.0)
+            push!(tlens, q)
+            push!(indices, checklist[i])
+        end
     end
-    store = tlens .> 0.0
-    tlens = tlens[store]
-    indices = checklist[store]
     return (indices, tlens)
 end
 
@@ -348,4 +349,4 @@ function test()
 
 end
 
-#test()
+test()
