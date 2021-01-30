@@ -169,19 +169,16 @@ function pixelray(
     return (indices, tlens)
 end
 
-
-function constructmatrix(tree::Cell, vv::Vector{HyperRectangle{2,Float64}}, Nproj::Int64, theta)
+function constructmatrix(tree::Cell, vv::Vector{HyperRectangle{2,Float64}}, Nrays::Int64, theta)
     r = sqrt(2) # Radius of the transform.
-    Na = length(theta)
+    Nproj = length(theta)
     if (~isa(theta, Union{SArray,Array}))
         theta = [theta]
     end
-    if (Nproj > 1)
-        span = range(r, stop = -r, length = Nproj)
-    else
-        span = [0.0]
-    end
-    Ntotal = Na * Nproj
+
+    span = range(r, stop = -r, length = Nrays)
+
+    Ntotal = Nrays * Nproj
     rows = Vector{Int64}()
     cols = Vector{Int64}()
     vals = Vector{Float64}()
@@ -198,14 +195,67 @@ function constructmatrix(tree::Cell, vv::Vector{HyperRectangle{2,Float64}}, Npro
     end
 
     t = time()
-    for a = 1:Na
+    for a = 1:Nproj
         dir = [cos(theta[a]), sin(theta[a])]
         aux = [-sin(theta[a]), cos(theta[a])]
-        Threads.@threads for i = 1:Nproj
-            rayindex = (a - 1) * Nproj + i
+        Threads.@threads for i = 1:Nrays
+            rayindex = (a - 1) * Nrays + i
             p1 = dir + aux * span[i]
             p2 = p1 - 2 * dir * r
             or = ray2d(p1, p2)
+            checklist = possiblevoxels(or, tree) #Possible elements.
+            indices, tlens = pixelray(or, vv, checklist)
+            Nel = length(indices)
+
+            append!(rows[Threads.threadid()],rayindex * ones(Int64, length(tlens)))
+            append!(cols[Threads.threadid()], indices)
+            append!(vals[Threads.threadid()], tlens)
+  
+        end
+    end
+    rows = vcat(rows...)
+    cols = vcat(cols...)
+    vals = vcat(vals...)
+    M = sparse(rows, cols, vals, Ntotal, Nofpixels)
+    println("Matrix constructed in ", time() - t, " seconds.")
+    return M
+end
+
+
+
+function constructmatrix(tree::Cell, vv::Vector{HyperRectangle{2,Float64}}, rays::Array{Array{ray2d,1},1})
+    r = sqrt(2) # Radius of the transform.
+    Nproj = length(rays)
+    for i = 1:Nproj-1
+        @assert length(rays[i]) == length(rays[i+1])
+    end
+    Nrays = length(rays[1])
+    Ntotal = Nrays * Nproj
+    rows = Vector{Int64}()
+    cols = Vector{Int64}()
+    vals = Vector{Float64}()
+    Nofpixels = length(vv)
+
+    Nth = Threads.nthreads()
+    rows = Vector{Vector{Int64}}(undef, Nth)
+    cols = Vector{Vector{Int64}}(undef, Nth)
+    vals = Vector{Vector{Float64}}(undef, Nth)
+    for p = 1:Nth
+        rows[p] = []
+        cols[p] = []
+        vals[p] = []
+    end
+
+    t = time()
+    for a = 1:Nproj
+        #dir = [cos(theta[a]), sin(theta[a])]
+        #aux = [-sin(theta[a]), cos(theta[a])]
+        Threads.@threads for i = 1:Nrays
+            rayindex = (a - 1) * Nrays + i
+            #p1 = dir + aux * span[i]
+            #p2 = p1 - 2 * dir * r
+            #or = ray2d(p1, p2)
+            or = rays[a][i]            
             checklist = possiblevoxels(or, tree) #Possible elements.
             indices, tlens = pixelray(or, vv, checklist)
             Nel = length(indices)
@@ -264,26 +314,60 @@ function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64)
     return (oct, voxelvector)
 end
 
+function constructrays(Nrays,Nproj)
+    r = sqrt(2)
+    rotations = range(0,stop=pi,length=Nproj)
+    rays = Vector{Vector{ray2d}}(undef,Nproj)
+
+    for i = 1:Nproj
+        span = range(r, stop = -r, length = Nrays)
+        rays[i] = Vector{ray2d}(undef,Nrays)
+        for j = 1:Nrays
+            dir = [cos(rotations[i]), sin(rotations[i])]
+            aux = [-sin(rotations[i]), cos(rotations[i])]
+            p1 = dir + aux * span[j]
+            p2 = p1 - 2 * dir * r
+            ray = ray2d(p1, p2)
+            rays[i][j] = ray
+        end
+    end
+
+    return rays
+end
 
 
 function test()
-    fn = "phanpix.mat"
-    Nx = 128; Ny = 128; Os = 4; 
-    Npr = 185; Na = 64
+    fn = "phanpix256.mat"
+    Nx = 256; Ny = 256; Os = 6; 
+    Nproj = 90; Nrays = 300
     (qt,pixelvector)=setuppixels(Nx,Ny,Os)
+    rays = constructrays(Nrays,Nproj)
+
+    # for i = 1:length(rays[2])
+    #     ray = rays[2][i]
+    #     ro = ray.origin
+    #     re = ray.origin + ray.dir
+    #     plot([ro[1], re[1]], [ro[2],re[2]])
+    # end
+    #error("")
     M = constructmatrix(
         qt,
         pixelvector,
-        Npr,
-        Array(range(0/ 2, stop = pi, length = Na)),
+        rays
     )
+    # M = constructmatrix(
+    #     qt,
+    #     pixelvector,
+    #     Nrays,
+    #     Array(range(0/ 2, stop = pi, length = Nproj)),
+    # )
     file = matopen(fn)
     zn = read(file, "m")
     zn = zn[:]
     y = M * zn
-    rad = reshape(y, Npr, Na)
+    rad = reshape(y,  Nrays,Nproj)
     imshow(rad, aspect = "auto")
-    return nothing
+    return rad
 end
 
-test()
+rad=test()
