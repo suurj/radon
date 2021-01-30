@@ -319,8 +319,8 @@ function constructrays(Nrays,Nproj)
     rays = Vector{Vector{ray2d}}(undef,Nproj)
 
     # Parallel beam.
-    #r = sqrt(2)
-    #rotations = range(0,stop=pi,length=Nproj)
+    # r = sqrt(2)
+    # rotations = range(pi/2,stop=-pi/2,length=Nproj)
 
     # for i = 1:Nproj
     #     span = range(r, stop = -r, length = Nrays)
@@ -335,12 +335,12 @@ function constructrays(Nrays,Nproj)
     #     end
     # end
 
-    d = 200
+
+    # # Fan-beam.
+    d = 2
     r = sqrt(2)
     span = range(r, stop = -r, length = Nrays)
-    rotations = range(-pi/2,stop=-pi/2+2*pi,length=Nproj)
-
-    # Fan-beam.
+    rotations = range(pi/2,stop=pi/2-2*pi,length=Nproj)
     for i = 1:Nproj
         source = [cos(rotations[i]), sin(rotations[i])]*d
         rays[i] = Vector{ray2d}(undef,Nrays)
@@ -392,3 +392,35 @@ function test()
 end
 
 rad=test()
+
+
+## MATLAB code to verify
+# clear all
+# close all
+# clc
+
+# N = 256;
+# m = phantom(N);
+# % theta = (  linspace(0,pi,180))/(2*pi)*360;
+# % %m = [zeros(256,256),m, zeros(256,0); zeros(256,512)];
+# % I = radon(m,theta)./(N*0.5);
+# % 
+# % imagesc(I)
+# % 
+# % return
+
+# D = 256;
+# [F,G,H]=fanbeam(m,D,'FanSensorGeometry', 'line',  'FanRotationIncrement',1);
+# imagesc(F./(N*0.5));
+
+# %K = F;
+# %K(:,180:end) = F(:,1:181); K(:,1:180) = F(:,181:end);
+# %K = [K; zeros(20,360)]; K(1:20,:) = []; 
+
+# %figure
+# %I = ifanbeam(F,D,'FanSensorGeometry', 'line', 'OutputSize', 200);
+# %imagesc(I)
+# figure
+# imagesc(m)
+
+# %sum(sum((m-I).^2))
