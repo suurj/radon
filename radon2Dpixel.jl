@@ -315,18 +315,39 @@ function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64)
 end
 
 function constructrays(Nrays,Nproj)
-    r = sqrt(2)
-    rotations = range(0,stop=pi,length=Nproj)
+
     rays = Vector{Vector{ray2d}}(undef,Nproj)
 
+    # Parallel beam.
+    #r = sqrt(2)
+    #rotations = range(0,stop=pi,length=Nproj)
+
+    # for i = 1:Nproj
+    #     span = range(r, stop = -r, length = Nrays)
+    #     rays[i] = Vector{ray2d}(undef,Nrays)
+    #     for j = 1:Nrays
+    #         dir = [cos(rotations[i]), sin(rotations[i])]
+    #         aux = [-sin(rotations[i]), cos(rotations[i])]
+    #         p1 = dir + aux * span[j]
+    #         p2 = p1 - 2 * dir * r
+    #         ray = ray2d(p1, p2)
+    #         rays[i][j] = ray
+    #     end
+    # end
+
+    d = 200
+    r = sqrt(2)
+    span = range(r, stop = -r, length = Nrays)
+    rotations = range(-pi/2,stop=-pi/2+2*pi,length=Nproj)
+
+    # Fan-beam.
     for i = 1:Nproj
-        span = range(r, stop = -r, length = Nrays)
+        source = [cos(rotations[i]), sin(rotations[i])]*d
         rays[i] = Vector{ray2d}(undef,Nrays)
-        for j = 1:Nrays
-            dir = [cos(rotations[i]), sin(rotations[i])]
-            aux = [-sin(rotations[i]), cos(rotations[i])]
-            p1 = dir + aux * span[j]
-            p2 = p1 - 2 * dir * r
+        for j = 1:Nrays           
+            aux = [-sin(rotations[i]), cos(rotations[i])]*span[j]
+            p1 = aux
+            p2 = source
             ray = ray2d(p1, p2)
             rays[i][j] = ray
         end
@@ -339,7 +360,7 @@ end
 function test()
     fn = "phanpix256.mat"
     Nx = 256; Ny = 256; Os = 6; 
-    Nproj = 90; Nrays = 300
+    Nproj = 360; Nrays = 369
     (qt,pixelvector)=setuppixels(Nx,Ny,Os)
     rays = constructrays(Nrays,Nproj)
 
