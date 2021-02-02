@@ -304,7 +304,7 @@ function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64)
 
     for j = 1:sizey
         for i = 1:sizex
-            ll = l .+ reshape(cellsize .* [i - 1,  sizey - j + 1], 1, 2)
+            ll = l .+ reshape(cellsize .* [i - 1,  sizey - j + 1], 1, 2) # Flip Y-axis so that we have canonical Euclidean coordinate system.
             origin = @SVector[
                 minimum(ll[:, 1]),
                 minimum(ll[:, 2]),
@@ -433,9 +433,16 @@ function test()
 end
 
 y,M=test()
-Q =rsvd(M, 400)
+
+# Simple reconstruction.
+figure()
+Q = rsvd(M, 400)
 x = (sparse(Q.Vt')*(spdiagm(0=>1.0./Q.S))*(sparse(Q.U')*y));
 imshow(reshape(x,256,256))
+
+
+
+#################################################################################
 
 ## MATLAB code to compare (detector&source are not in the same scale, however).
 # clear all
