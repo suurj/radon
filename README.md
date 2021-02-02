@@ -7,7 +7,7 @@ On the other hand, the second code uses raycasting to construct a discrete 3D Jo
 The third code, _radon3Dvoxel.jl_, constructs a 3D Radon transform operator, which approximates the transform by applying a voxel mesh.
 
 For instance, one can obtain discrete Radon transform for a mesh by using first the function _constructmatrix_, which returns a matrix **M**. Then **r=M\*x**, where **x** is a vector of trial function node values, and **sinogram=reshape(r,N,T)**. 
-Naturally, 2D Radon transform matrix operator can be rather easily build to work with pixels instead of the triangular elements, if the 3D routines are modified. 
+The fourth code,  _radon2Dpixel.jl_, uses pixels as finite-dimensional basis for a given object. The code can be used to construct a fan-beam transform theory matrix. This is demonstrated to a case, where a phantom is rotated off-the-origin around its center of mass (file _r.mat_).
 
 ## Requirements
 - RegionTrees.jl
@@ -17,4 +17,7 @@ Naturally, 2D Radon transform matrix operator can be rather easily build to work
 - MAT.jl 
 - Statistics.jl
 - SparseArrays.jl
+- ProgressBars.jl
+- (RandomizedLinAlg.jl, for a very simple reconstruction in 2D pixel case)
+
 
