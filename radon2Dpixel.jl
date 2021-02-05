@@ -35,17 +35,12 @@ end
     r::ray2d,
     b::HyperRectangle{2,Float64},
 )::Float64
-    #parameters = @SVector[b.origin, b.origin + b.widths]
-    #tmin = (parameters[r.sign[1]+1][1] - r.origin[1]) * r.inv_direction[1]
-    #tmax = (parameters[1-r.sign[1]+1][1] - r.origin[1]) * r.inv_direction[1]
-    #tymin = (parameters[r.sign[2]+1][2] - r.origin[2]) * r.inv_direction[2]
-    #tymax = (parameters[1-r.sign[2]+1][2] - r.origin[2]) * r.inv_direction[2]
 
     if (r.inv_direction[1] >= 0.0)
         #tmin = (parameters[1][1] - r.origin[1]) * r.inv_direction[1]
         tmin = (b.origin[1] - r.origin[1]) * r.inv_direction[1]
         #tmax = (parameters[2][1] - r.origin[1]) * r.inv_direction[1]
-        tmax = ((b.origin[1] + b.widths[1]) - r.origin[1]) * r.inv_direction[1]
+        tmax = (prevfloat(b.origin[1] + b.widths[1]) - r.origin[1]) * r.inv_direction[1]
     else
         #tmin = (parameters[2][1] - r.origin[1]) * r.inv_direction[1]
         tmin = ((b.origin[1] + b.widths[1]) - r.origin[1]) * r.inv_direction[1]
@@ -57,14 +52,13 @@ end
         #tymin = (parameters[1][2] - r.origin[2]) * r.inv_direction[2]
         tymin = (b.origin[2]  - r.origin[2]) * r.inv_direction[2]      
         #tymax = (parameters[2][2]- r.origin[2]) * r.inv_direction[2]
-        tymax = ((b.origin[2] + b.widths[2]) - r.origin[2]) * r.inv_direction[2]
+        tymax = (prevfloat(b.origin[2] + b.widths[2]) - r.origin[2]) * r.inv_direction[2]
     else
         #tymin = (parameters[2][2] - r.origin[2]) * r.inv_direction[2]
         tymin = ((b.origin[2] + b.widths[2]) - r.origin[2]) * r.inv_direction[2]      
         #tymax = (parameters[1][2] - r.origin[2]) * r.inv_direction[2]
         tymax = (b.origin[2]  - r.origin[2]) * r.inv_direction[2]
     end
-
     if ((tmin > tymax) || (tymin > tmax))
         return -1.0
     end
@@ -75,10 +69,21 @@ end
          tmax = tymax
     end
 
-    #println(tmin,",",tmax)
+    if (isnan(tmin))
+        #error("NaN detected")
+       return b.widths[1]
+    end
+
+    if (isnan(tymin))
+        #error("NaN detected")
+       return  b.widths[2]
+    end
+
     return norm(r.dir*(tmax-tmin))
 
+
 end
+
 
 @inline function intersects(
     a::HyperRectangle{N,Float64},
@@ -196,7 +201,11 @@ function constructmatrix(tree::Cell, vv::Vector{HyperRectangle{2,Float64}}, Nray
     end
 
     t = time()
-    pb = ProgressBar(1:Nproj)
+    if (Nproj > 1)
+        pb = ProgressBar(1:Nproj)
+    else
+        pb = 1:1
+    end
     for a in pb
         dir = [cos(theta[a]), sin(theta[a])]
         aux = [-sin(theta[a]), cos(theta[a])]
@@ -249,7 +258,11 @@ function constructmatrix(tree::Cell, vv::Vector{HyperRectangle{2,Float64}}, rays
     end
 
     t = time()
-    pb = ProgressBar(1:Nproj)
+    if (Nproj > 1)
+        pb = ProgressBar(1:Nproj)
+    else
+        pb = 1:1
+    end
     for a in pb
         Threads.@threads for i = 1:Nrays
             rayindex = (a - 1) * Nrays + i
@@ -320,16 +333,16 @@ function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64)
     return (oct, pixelvector)
 end
 
-function constructrays(Nrays,Nproj;center=[0,0.0])
+function constructrays(Nrays,Nproj;center=[0,0.0],rotations=range(-pi/2,stop=3/4*2*pi,length=Nproj),dete_radius=sqrt(2),source_radius=sqrt(2),dete_plate_span=range(-sqrt(2), stop = sqrt(2), length = Nrays))
 
+    @assert length(dete_plate_span) == Nrays
+    @assert length(rotations) == Nproj
     rays = Vector{Vector{ray2d}}(undef,Nproj)
 
     # Parallel beam.
-    # r = sqrt(2)
-    # rotations = range(0,stop=2*pi,length=Nproj)
 
     # for i = 1:Nproj
-    #     span = range(r, stop = -r, length = Nrays)
+    #     span = dete_plate_span#range(r, stop = -r, length = Nrays)
     #     rays[i] = Vector{ray2d}(undef,Nrays)
     #     for j = 1:Nrays
     #         dir = [cos(rotations[i]), sin(rotations[i])]
@@ -349,19 +362,13 @@ function constructrays(Nrays,Nproj;center=[0,0.0])
 
 
     # # Fan-beam.
-    dsource_origo = 5
-    ddetect_origo = 5
-    r = sqrt(2)*(dsource_origo+ddetect_origo)/dsource_origo
+    #source_origo = 5; ddetect_origo = 5; r = sqrt(2)*(dsource_origo+ddetect_origo)/dsource_origo
     
-    span = range(-2r, stop = r, length = Nrays)
-    if (Nproj >1 )
-        rotations = range(0,stop=-2*pi,length=Nproj)
-    else
-        rotations = [0.0,]
-    end
+    span = dete_plate_span# range(-2r, stop = r, length = Nrays)
+
     for i = 1:Nproj
-        source = [cos(rotations[i]), sin(rotations[i])]*dsource_origo + center
-        detcenter = -[cos(rotations[i]), sin(rotations[i])]*ddetect_origo
+        source = [cos(rotations[i]), sin(rotations[i])]*dete_radius + center
+        detcenter = -[cos(rotations[i]), sin(rotations[i])]*dete_radius
         rays[i] = Vector{ray2d}(undef,Nrays)
         for j = 1:Nrays           
             aux = [-sin(rotations[i]), cos(rotations[i])]*span[j] + detcenter + center
@@ -391,54 +398,45 @@ function test()
     (qt,pixelvector)=setuppixels(Nx,Ny,Os)
     cent = [-0.5,0.5]
     file = matopen(fn)
-    #zn = read(file, "m")
-    # zn = zn[:]
     close("all")
     #figure()
     zn = read(file, "S")
     
-    rays = constructrays(Nrays,Nproj;center=cent)
+    rotations=range(3/4*2*pi,stop=-pi/2,length=Nproj)#[3/4*2*pi + 0/6*pi,]
+    dete_radius = 5.0
+    source_radius = 5.0
+    r = sqrt(2)*(dete_radius+source_radius)/dete_radius
+    dete_plate_span = range(1.5r, stop = -2r, length = Nrays)
+    rays = constructrays(Nrays,Nproj;center=cent,rotations=rotations,dete_radius=dete_radius,source_radius=source_radius,dete_plate_span=dete_plate_span)
+
     #imshow(reshape(zn[:,1],256,256),extent=[-1,1,-1,1])
     #xlim([-5,5])
     #ylim([-5,5])
 
-    # for i = 1:length(rays[2])
-    #     ray = rays[2][i]
-    #     ro = ray.origin
-    #     re = ray.origin + ray.dir
-    #     plot([ro[1], re[1]], [ro[2],re[2]])
-    # end
-    #error("")
     M = constructmatrix(qt, pixelvector, rays)
-    # M = constructmatrix(
-    #     qt,
-    #     pixelvector,
-    #     Nrays,
-    #     Array(range(0/ 2, stop = pi, length = Nproj)),
-    # )
     
-    y = M * zn[:,1]
+    yp = M * zn[:,1]
 
     # Nlog = size(zn)[2]
     # rad = zeros(Nrays,Nlog)
     # for i = 1:Nlog
     #     p = zn[:,i]
-    #     y = M * p
-    #     rad[:,i] = y
+    #     yp = M * p
+    #     rad[:,i] = yp
     # end
     figure()
-    rad = reshape(y,  Nrays,Nproj)
+    rad = reshape(yp,  Nrays,Nproj)
     imshow(rad, aspect = "auto")
-    return y,M
+    return rad,M
 end
 
 y,M=test()
 
 # Simple reconstruction.
-figure()
-Q = rsvd(M, 400)
-x = (sparse(Q.Vt')*(spdiagm(0=>1.0./Q.S))*(sparse(Q.U')*y));
-imshow(reshape(x,256,256))
+# figure()
+#Q = rsvd(M, 500)
+# x = (sparse(Q.Vt')*(spdiagm(0=>1.0./Q.S))*(sparse(Q.U')*y));
+# imshow(reshape(x,256,256))
 
 
 
