@@ -108,7 +108,7 @@ function possiblevoxels(r::plane3d, tree::Cell)::Vector{Int64}
     if (isleaf(tree) && intersects(r, tree.boundary) > 0.0)
         return tree.data
 
-    elseif (~(tree.parent == nothing) && intersects(r, tree.boundary) > 0.0)
+    elseif (~(tree.parent === nothing) && intersects(r, tree.boundary) > 0.0)
         N = length(tree.children)
         v = Vector{Int64}()
         for i = 1:N
@@ -116,7 +116,7 @@ function possiblevoxels(r::plane3d, tree::Cell)::Vector{Int64}
         end
         return v
 
-    elseif ((tree.parent == nothing) && intersects(r, tree.boundary) > 0.0)
+    elseif ((tree.parent === nothing) && intersects(r, tree.boundary) > 0.0)
         N = length(tree.children)
         v = Vector{Int64}()
         for i = 1:N

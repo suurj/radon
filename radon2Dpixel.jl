@@ -6,8 +6,9 @@ using LinearAlgebra
 using SparseArrays
 using VectorizedRoutines
 using ProgressBars
-using RandomizedLinAlg
+#using RandomizedLinAlg
 using MAT
+using Images
 
 struct ray2d
     origin::Union{SVector{2,Float64},Vector{Float64}}
@@ -134,7 +135,7 @@ function possiblepixels(r::ray2d, tree::Cell)::Vector{Int64}
     if (isleaf(tree) && intersects(r, tree.boundary) > 0.0)
         return tree.data
 
-    elseif (~(tree.parent == nothing) && intersects(r, tree.boundary) > 0.0)
+    elseif (~(tree.parent === nothing) && intersects(r, tree.boundary) > 0.0)
         N = length(tree.children)
         v = Vector{Int64}()
         for i = 1:N
@@ -142,7 +143,7 @@ function possiblepixels(r::ray2d, tree::Cell)::Vector{Int64}
         end
         return v
 
-    elseif ((tree.parent == nothing) && intersects(r, tree.boundary) > 0.0)
+    elseif ((tree.parent === nothing) && intersects(r, tree.boundary) > 0.0)
         N = length(tree.children)
         v = Vector{Int64}()
         for i = 1:N
@@ -333,7 +334,7 @@ function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64)
     return (oct, pixelvector)
 end
 
-function constructrays(Nrays,Nproj;center=[0,0.0],rotations=range(-pi/2,stop=3/4*2*pi,length=Nproj),dete_radius=sqrt(2),source_radius=sqrt(2),dete_plate_span=range(-sqrt(2), stop = sqrt(2), length = Nrays))
+function constructrays(Nrays,Nproj;center=zeros(2,Nproj),rotations=range(-pi/2,stop=3/4*2*pi,length=Nproj),dete_radius=sqrt(2),source_radius=sqrt(2),dextra_rot = zeros(Nproj,),dete_plate_span=range(-sqrt(2), stop = sqrt(2), length = Nrays))
 
     @assert length(dete_plate_span) == Nrays
     @assert length(rotations) == Nproj
@@ -367,25 +368,43 @@ function constructrays(Nrays,Nproj;center=[0,0.0],rotations=range(-pi/2,stop=3/4
     span = dete_plate_span# range(-2r, stop = r, length = Nrays)
 
     for i = 1:Nproj
-        source = [cos(rotations[i]), sin(rotations[i])]*dete_radius + center
+        source = [cos(rotations[i]), sin(rotations[i])]*source_radius + center[:,i]
         detcenter = -[cos(rotations[i]), sin(rotations[i])]*dete_radius
         rays[i] = Vector{ray2d}(undef,Nrays)
-        for j = 1:Nrays           
-            aux = [-sin(rotations[i]), cos(rotations[i])]*span[j] + detcenter + center
+        # ps = zeros(2,2)
+        totcenter = detcenter + center[:,i]
+        for j = 1:Nrays                    
+            aux = [-sin(rotations[i]+dextra_rot[i]), cos(rotations[i]+dextra_rot[i])]*span[j] + totcenter
+            #aux[1] = (aux[1] - totcenter[1])*cos(dextra_rot[i]) - (aux[2] - totcenter[2])*sin(dextra_rot[i]) + totcenter[1]
+            #aux[2] = (aux[2] - totcenter[2])*cos(dextra_rot[i]) + (aux[1] - totcenter[1])*sin(dextra_rot[i]) + totcenter[2]
             p1 = aux
             p2 = source
             ray = ray2d(p1, p2)
             rays[i][j] = ray
 
+            # if(j==1)
+            #     ps[1,:] = aux
+            # elseif(j==Nrays)
+            #     ps[2,:] = aux
+            # end
+
             #plot([rays[i][j].origin[1], rays[i][j].origin[1] +  rays[i][j].dir[1]],[rays[i][j].origin[2], rays[i][j].origin[2] +  rays[i][j].dir[2]] )
+            #scatter(aux[1],aux[2])
             
         end
-    #     #plot([rays[i][1].origin[1], rays[i][1].origin[1] +  rays[i][1].dir[1]],[rays[i][1].origin[2], rays[i][1].origin[2] +  rays[i][1].dir[2]] )
-    #     #plot([rays[i][end].origin[1], rays[i][end].origin[1] +  rays[i][end].dir[1]],[rays[i][end].origin[2], rays[i][end].origin[2] +  rays[i][end].dir[2]] )
-    #     #plot(-sin(rotations[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ detcenter[1] .+ center[1] ,cos(rotations[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ detcenter[2] .+center[2] )
-    #     #error("")
+        # plot([rays[i][1].origin[1], rays[i][1].origin[1] +  rays[i][1].dir[1]],[rays[i][1].origin[2], rays[i][1].origin[2] +  rays[i][1].dir[2]] )
+        # plot([rays[i][end].origin[1], rays[i][end].origin[1] +  rays[i][end].dir[1]],[rays[i][end].origin[2], rays[i][end].origin[2] +  rays[i][end].dir[2]] )
+        
+        ###plot(-sin(rotations[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[1] , cos(rotations[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[2]  )
+        # plot(ps[:,1],ps[:,2])
+        # scatter(source[1],source[2])
+        # scatter(totcenter[1],totcenter[2])
+        # println(norm((ps[1,:] - ps[2,:])) ,ps)
+        # #xlim([-9,9])
+        # #ylim([-9,9])
+        # axis(:equal)
      end
-    
+     #error("")
     return rays
 end
 
@@ -394,20 +413,48 @@ function test()
     #fn = "phanpix256.mat"
     fn = "r.mat"
     Nx = 256; Ny = 256; Os = 6; 
-    Nproj = 360; Nrays = 250
+    Nproj = 360; 
+    Nrays = 300
     (qt,pixelvector)=setuppixels(Nx,Ny,Os)
-    cent = [-0.5,0.5]
+    cent = 0*ones(2,Nproj)
+    #cent = cent.*[-0.5,0.5]
     file = matopen(fn)
     close("all")
     #figure()
-    zn = read(file, "S")
+    # zn = read(file, "S")
+    # zn = zn[:,1]
+
+    fn = "kuvio.png"
+    zn = load(fn)
+    zn = channelview(zn)
+    zn = zn[:]
     
-    rotations=range(3/4*2*pi,stop=-pi/2,length=Nproj)#[3/4*2*pi + 0/6*pi,]
-    dete_radius = 5.0
-    source_radius = 5.0
-    r = sqrt(2)*(dete_radius+source_radius)/dete_radius
-    dete_plate_span = range(1.5r, stop = -2r, length = Nrays)
-    rays = constructrays(Nrays,Nproj;center=cent,rotations=rotations,dete_radius=dete_radius,source_radius=source_radius,dete_plate_span=dete_plate_span)
+
+    ## When compared to ODL, the logic of the detector span is the same: it should start from negative, so
+    ## detector_partition = odl.uniform_partition(-8, 4, 100) equals dete_plate_span = range(-8, stop = 4, length = Nrays)
+
+    ## However, with the default angle settings in ODL, π radians must be added here to obtain the same 
+    ## rotational span due to the inverted logic: 
+    ## angle_partition = odl.uniform_partition(0,2*np.pi, 360) equals  rotations = range(0+pi,stop=2*pi+pi,length=360)
+
+    ## ODL's parameter det_axis_init=[1,-0.5] refers to extra rotation of the detector plate. That is,
+    ## det_axis_init=[3,-0.7] equals dextra_rot = atan(-0.7/3)*ones(Nproj,)
+
+    ## Source and detector radiuses have the same logic.
+
+    ## TODO: translations/shifts.
+
+        
+    #rotations=range(3/4*2*pi,stop=-pi/2,length=Nproj)#[3/4*2*pi + 0/6*pi,]
+    rotations=  range(0+pi,stop=2*pi+pi,length=Nproj)
+    #rotations = range(2*pi +pi,stop=0 +pi,length=Nproj)
+
+    dete_radius = 3.0
+    source_radius = 10.0
+    r = 1;
+    dete_plate_span = range(-8, stop = 4, length = Nrays)
+    dextra_rot = atan(-0.7/3)*ones(Nproj,)
+    rays = constructrays(Nrays,Nproj;center=cent,rotations=rotations,dete_radius=dete_radius,source_radius=source_radius,dextra_rot = dextra_rot, dete_plate_span=dete_plate_span)
 
     #imshow(reshape(zn[:,1],256,256),extent=[-1,1,-1,1])
     #xlim([-5,5])
@@ -415,7 +462,7 @@ function test()
 
     M = constructmatrix(qt, pixelvector, rays)
     
-    yp = M * zn[:,1]
+    yp = M * zn
 
     # Nlog = size(zn)[2]
     # rad = zeros(Nrays,Nlog)
@@ -426,7 +473,12 @@ function test()
     # end
     figure()
     rad = reshape(yp,  Nrays,Nproj)
+    println(size(rad))
+    #plot(rad)
     imshow(rad, aspect = "auto")
+    title("Julia")
+    # figure()
+    # imshow(reshape(zn,256,256))
     return rad,M
 end
 
@@ -442,33 +494,74 @@ y,M=test()
 
 #################################################################################
 
-## MATLAB code to compare (detector&source are not in the same scale, however).
-# clear all
-# close all
-# clc
+# ## ODL code to compare 
+# import numpy as np
+# import odl
+# import scipy.io
+# from PIL import Image
+# import matplotlib.pyplot as plt
 
-# N = 256;
-# m = phantom(N);
-# % theta = (  linspace(0,pi,180))/(2*pi)*360;
-# % %m = [zeros(256,256),m, zeros(256,0); zeros(256,512)];
-# % I = radon(m,theta)./(N*0.5);
-# % 
-# % imagesc(I)
-# % 
-# % return
+# plt.close("all")
 
-# D = 256;
-# [F,G,H]=fanbeam(m,D,'FanSensorGeometry', 'line',  'FanRotationIncrement',1);
-# imagesc(F./(N*0.5));
+# # Reconstruction space: discretized functions on the rectangle
+# # [-20, 20]^2 with 300 samples per dimension.
+# reco_space = odl.uniform_discr(
+#     min_pt=[-1, -1], max_pt=[1, 1], shape=[256, 256], dtype='float32')
 
-# %K = F;
-# %K(:,180:end) = F(:,1:181); K(:,1:180) = F(:,181:end);
-# %K = [K; zeros(20,360)]; K(1:20,:) = []; 
 
-# %figure
-# %I = ifanbeam(F,D,'FanSensorGeometry', 'line', 'OutputSize', 200);
-# %imagesc(I)
-# figure
-# imagesc(m)
+# # Make a fan beam geometry with flat detector
+# # Angles: uniformly spaced, n = 360, min = 0, max = 2 * pi
+# angle_partition = odl.uniform_partition(0,2*np.pi, 360)
+# # Detector: uniformly sampled, n = 512, min = -30, max = 30
+# detector_partition = odl.uniform_partition(-8, 4, 300) # What is the coordinate system? det_axis_init=[1,-1]
+# #geometry = odl.tomo.FanFlatGeometry(angle_partition, detector_partition, src_radius=50, det_radius=np.sqrt(2),translation=[-0.5,-0.5])
+# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, det_axis_init=[3,-0.7], src_radius=10, det_radius=3, translation=[0,0])
 
-# %sum(sum((m-I).^2))
+# # Ray transform (= forward projection).
+# ray_trafo = odl.tomo.RayTransform(reco_space, geometry, impl='astra_cpu')
+
+# # Create a discrete Shepp-Logan phantom (modified version)
+# # mat = scipy.io.loadmat('r.mat')
+# # M = mat['S']
+# # mat = M[:,0]
+# # phantom = np.reshape(mat,(256,256)).T
+# # proj_data = ray_trafo(phantom)
+# # p = proj_data.data.T
+
+# mat = Image.open("kuvio.png").convert('L')
+# # wpercent = (Nimage / float(mat.size[0]))
+# # size = int((float(mat.size[1]) * float(wpercent)))
+# # mat = mat.resize((size, size), Image.ANTIALIAS)
+# phantom = np.array(mat)/255.0
+# proj_data = ray_trafo(phantom)
+# p = proj_data.data.T
+
+# # A = np.zeros((512,360))
+# # for i in range(360):
+# #     mat = M[:,i]
+# #     phantom = np.reshape(mat,(256,256)).T
+# #     proj_data = ray_trafo(phantom)
+# #     p = proj_data.data
+# #     A[:,i] = p
+# #phantom = odl.phantom.shepp_logan(reco_space, modified=True)
+# #phantom=odl.phantom()
+
+# # Create projection data by calling the ray transform on the phantom
+# #proj_data = ray_trafo(phantom)
+
+# # Back-projection can be done by simply calling the adjoint operator on the
+# # projection data (or any element in the projection space).
+# #backproj = ray_trafo.adjoint(proj_data)
+
+# # Shows a slice of the phantom, projections, and reconstruction
+
+# #plt.imshow(phantom)
+# print(p.shape)
+# plt.figure()
+# plt.imshow(p,aspect = "auto")
+# plt.title("ODL")
+# #plt.plot(p)
+# plt.show()
+# #proj_data.show(title='Projection Data (sinogram)',force_show=True)
+# #backproj.show(title='Back-projection', force_show=True)
+

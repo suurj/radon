@@ -87,7 +87,7 @@ end
 
 function printdata(tree::Cell)
     for i = 1:length(tree.children)
-        if (tree[i].children != nothing)
+        if (tree[i].children !== nothing)
             for j = 1:length(tree[i].children)
                 println(i, " ", j, " ", tree[i][j].data)
             end
@@ -118,7 +118,7 @@ function possiblevoxels(r::ray3d, tree::Cell)::Vector{Int64}
     if (isleaf(tree) && intersects(r, tree.boundary) > 0.0)
         return tree.data
 
-    elseif (~(tree.parent == nothing) && intersects(r, tree.boundary) > 0.0)
+    elseif (~(tree.parent === nothing) && intersects(r, tree.boundary) > 0.0)
         N = length(tree.children)
         v = Vector{Int64}()
         for i = 1:N
@@ -126,7 +126,7 @@ function possiblevoxels(r::ray3d, tree::Cell)::Vector{Int64}
         end
         return v
 
-    elseif ((tree.parent == nothing) && intersects(r, tree.boundary) > 0.0)
+    elseif ((tree.parent === nothing) && intersects(r, tree.boundary) > 0.0)
         N = length(tree.children)
         v = Vector{Int64}()
         for i = 1:N
