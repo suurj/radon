@@ -99,9 +99,9 @@ end
 end
 
 
-function inittree2d(n)
+function inittree2d(n;lowx= -1.0, lowy = -1.0, wx = 2.0, wy = 2.0)
     empty::Array{Int64,1} = []
-    oct = Cell(SVector(-1.0, -1), SVector(2.0, 2), empty)
+    oct = Cell(SVector(lowx, lowy), SVector(wx, wx), empty)
     for _ = 1:n
         for leaf in allleaves(oct)
             split!(leaf)
@@ -236,7 +236,6 @@ end
 
 
 function constructmatrix(tree::Cell, vv::Vector{HyperRectangle{2,Float64}}, rays::Array{Array{ray2d,1},1})
-    r = sqrt(2) # Radius of the transform.
     Nproj = length(rays)
     for i = 1:Nproj-1
         @assert length(rays[i]) == length(rays[i+1])
@@ -303,16 +302,21 @@ function sub2ind(sizes, i::Int64, j::Int64, k::Int64)
 end
 
 
-function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64)
-    oct = inittree2d(octsize)
-    l = Array([ [0.0, 0] [1, 0] [1, 1] [0, 1.0]]')
-    pm = mean(l, dims = 1)
+function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64;lowy = -1.0, lowx = -1.0, widthy = 2, widthx = 2)
+    @assert widthy == widthx
+    oct = inittree2d(octsize;lowx= lowx, lowy = lowy, wx = widthx, wy = widthy)  
     size = [sizex, sizey]
-    cellsize = 2.0 ./ size
+    cellsize = [widthx,widthy] ./ size
+    wds = [widthx,widthy]
     width = @SVector[cellsize[1], cellsize[2]]
-    for i = 1:2
-        l[:, i] = cellsize[i] .* (l[:, i] .- pm[i]) .- cellsize[i] / 2.0 * size[i] .+ 0.5 * cellsize[i]
-    end
+    #l = Array([ [0.0, 0] [1, 0] [1, 1] [0, 1.0]]')
+    #pm = mean(l, dims = 1)
+    # for i = 1:2
+    #     l[:, i] = cellsize[i] .* (l[:, i] .- pm[i]) .- cellsize[i] / 2.0 * size[i] .+ 0.5 * cellsize[i]
+    # end
+    l = [[lowx, lowy] [lowx + cellsize[1], lowy ] [lowx , lowy + cellsize[2]] [lowx + cellsize[1], lowy + cellsize[2]] ]'
+    # println(l)
+    # error("")
     pixelvector = Vector{HyperRectangle{2,Float64}}(undef, sizex * sizey)
     t = time()
 
@@ -334,7 +338,7 @@ function setuppixels(sizex::Int64,sizey::Int64,octsize::Int64)
     return (oct, pixelvector)
 end
 
-function constructrays(Nrays,Nproj;center=zeros(2,Nproj),rotations=range(-pi/2,stop=3/4*2*pi,length=Nproj),dete_radius=sqrt(2),source_radius=sqrt(2),dextra_rot = zeros(Nproj,),dete_plate_span=range(-sqrt(2), stop = sqrt(2), length = Nrays))
+function constructparallelrays(Nrays,Nproj;rotations=range(-pi/2,stop=3/4*2*pi,length=Nproj),dete_plate_span=range(-sqrt(2), stop = sqrt(2), length = Nrays))
 
     @assert length(dete_plate_span) == Nrays
     @assert length(rotations) == Nproj
@@ -342,43 +346,64 @@ function constructrays(Nrays,Nproj;center=zeros(2,Nproj),rotations=range(-pi/2,s
 
     # Parallel beam.
 
-    # for i = 1:Nproj
-    #     span = dete_plate_span#range(r, stop = -r, length = Nrays)
-    #     rays[i] = Vector{ray2d}(undef,Nrays)
-    #     for j = 1:Nrays
-    #         dir = [cos(rotations[i]), sin(rotations[i])]
-    #         #aux = [-sin(rotations[i]), cos(rotations[i])]
-    #         aux = [-sin(rotations[i]), cos(rotations[i])]*span[j] + center
-    #         p1 =  aux #* span[j]
-    #         #p2 = p1 - 2 * dir * r
-    #         #ray = ray2d(p1, p2)
-    #         ray = ray2ddir(p1,dir)
-    #         rays[i][j] = ray
+    for i = 1:Nproj
+        span = dete_plate_span#range(r, stop = -r, length = Nrays)
+        rays[i] = Vector{ray2d}(undef,Nrays)
+        for j = 1:Nrays
+            dir = [cos(rotations[i]), sin(rotations[i])]
+            #aux = [-sin(rotations[i]), cos(rotations[i])]
+            aux = [-sin(rotations[i]), cos(rotations[i])]*span[j] + center
+            p1 =  aux #* span[j]
+            #p2 = p1 - 2 * dir * r
+            #ray = ray2d(p1, p2)
+            ray = ray2ddir(p1,dir)
+            rays[i][j] = ray
             
-    #         #plot([ray.origin[1], ray.origin[1] +  ray.dir[1]],[ray.origin[2], ray.origin[2] +  ray.dir[2]] )
-    #        # plot([rays[i][j].origin[1], rays[i][j].origin[1] +  rays[i][j].dir[1]],[rays[i][j].origin[2], rays[i][j].origin[2] +  rays[i][j].dir[2]] )
+            #plot([ray.origin[1], ray.origin[1] +  ray.dir[1]],[ray.origin[2], ray.origin[2] +  ray.dir[2]] )
+           # plot([rays[i][j].origin[1], rays[i][j].origin[1] +  rays[i][j].dir[1]],[rays[i][j].origin[2], rays[i][j].origin[2] +  rays[i][j].dir[2]] )
 
-    #     end
-    # end
+        end
+    end
 
+    return rays
 
-    # # Fan-beam.
-    #source_origo = 5; ddetect_origo = 5; r = sqrt(2)*(dsource_origo+ddetect_origo)/dsource_origo
+end
+
+function constructfanrays(Nrays,Nproj;translation=[0,0.0],src_to_det_init=[0,1],det_axis_init = nothing,det_shift_func=a->[0,0.0],apart=range(0,stop=pi,length=Nproj),det_radius=sqrt(2),src_radius=sqrt(2),dpart=range(-sqrt(2), stop = sqrt(2), length = Nrays))
+
+    @assert length(dpart) == Nrays
+    @assert length(apart) == Nproj
+    rays = Vector{Vector{ray2d}}(undef,Nproj)
+
+    sdinit = 2*pi*1/4+atan(src_to_det_init[2],src_to_det_init[1]) 
+    apart = apart .+ sdinit
+
+    dextra_rot = 0.0
+
+    if (det_axis_init === nothing)
+        dextra_rot = 0.0
+    else   
+        dinit = 2*pi*1/4+atan(det_axis_init[2],det_axis_init[1])
+        dextra_rot = mod((2*pi*1/4-(sdinit-dinit)),2*pi)
+    end
     
-    span = dete_plate_span# range(-2r, stop = r, length = Nrays)
+    span = dpart
 
     for i = 1:Nproj
-        source = [cos(rotations[i]), sin(rotations[i])]*source_radius + center[:,i]
-        detcenter = -[cos(rotations[i]), sin(rotations[i])]*dete_radius
+        source = [cos(apart[i]), sin(apart[i])]*src_radius 
+        detcenter = -[cos(apart[i]), sin(apart[i])]*det_radius
         rays[i] = Vector{ray2d}(undef,Nrays)
         # ps = zeros(2,2)
-        totcenter = detcenter + center[:,i]
+        det_tangent = [-sin(apart[i]), cos(apart[i])]
+        det_orth = [cos(apart[i]), sin(apart[i])]
+        detshift = det_shift_func(apart[i])
+        totcenter = detcenter - detshift[1]*det_orth - detshift[2]*det_tangent
         for j = 1:Nrays                    
-            aux = [-sin(rotations[i]+dextra_rot[i]), cos(rotations[i]+dextra_rot[i])]*span[j] + totcenter
-            #aux[1] = (aux[1] - totcenter[1])*cos(dextra_rot[i]) - (aux[2] - totcenter[2])*sin(dextra_rot[i]) + totcenter[1]
-            #aux[2] = (aux[2] - totcenter[2])*cos(dextra_rot[i]) + (aux[1] - totcenter[1])*sin(dextra_rot[i]) + totcenter[2]
-            p1 = aux
-            p2 = source
+            aux = [-sin(apart[i]+dextra_rot), cos(apart[i]+dextra_rot)]*span[j] + totcenter
+            #aux[1] = (aux[1] - totcenter[1])*cos(dextra_rot) - (aux[2] - totcenter[2])*sin(dextra_rot) + totcenter[1]
+            #aux[2] = (aux[2] - totcenter[2])*cos(dextra_rot) + (aux[1] - totcenter[1])*sin(dextra_rot) + totcenter[2]
+            p1 = aux + translation
+            p2 = source + translation
             ray = ray2d(p1, p2)
             rays[i][j] = ray
 
@@ -395,7 +420,7 @@ function constructrays(Nrays,Nproj;center=zeros(2,Nproj),rotations=range(-pi/2,s
         # plot([rays[i][1].origin[1], rays[i][1].origin[1] +  rays[i][1].dir[1]],[rays[i][1].origin[2], rays[i][1].origin[2] +  rays[i][1].dir[2]] )
         # plot([rays[i][end].origin[1], rays[i][end].origin[1] +  rays[i][end].dir[1]],[rays[i][end].origin[2], rays[i][end].origin[2] +  rays[i][end].dir[2]] )
         
-        ###plot(-sin(rotations[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[1] , cos(rotations[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[2]  )
+        ###plot(-sin(apart[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[1] , cos(apart[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[2]  )
         # plot(ps[:,1],ps[:,2])
         # scatter(source[1],source[2])
         # scatter(totcenter[1],totcenter[2])
@@ -410,17 +435,12 @@ end
 
 
 function test()
-    #fn = "phanpix256.mat"
-    fn = "r.mat"
-    Nx = 256; Ny = 256; Os = 6; 
-    Nproj = 360; 
-    Nrays = 300
-    (qt,pixelvector)=setuppixels(Nx,Ny,Os)
-    cent = 0*ones(2,Nproj)
-    #cent = cent.*[-0.5,0.5]
-    file = matopen(fn)
+
     close("all")
-    #figure()
+    
+    #(qt,pixelvector)=setuppixels(Nx,Ny,Os)   # Default grid span is a rectangle with extents of [-1,-1] and [1,1].
+    #fn = "r.mat"
+    #file = matopen(fn)
     # zn = read(file, "S")
     # zn = zn[:,1]
 
@@ -430,31 +450,42 @@ function test()
     zn = zn[:]
     
 
-    ## When compared to ODL, the logic of the detector span is the same: it should start from negative, so
-    ## detector_partition = odl.uniform_partition(-8, 4, 100) equals dete_plate_span = range(-8, stop = 4, length = Nrays)
+    ## When compared to ODL, the logic of the detector span is the same. The span vector should be increasing, so
+    ## detector_partition = odl.uniform_partition(-8, 4, 100) equals dete_plate = range(-8, stop = 4, length = 100)
 
-    ## However, with the default angle settings in ODL, π radians must be added here to obtain the same 
-    ## rotational span due to the inverted logic: 
-    ## angle_partition = odl.uniform_partition(0,2*np.pi, 360) equals  rotations = range(0+pi,stop=2*pi+pi,length=360)
+    ## However, with the default angle settings in ODL,  π/2 radians plus a shift must be added  to obtain the same 
+    ## rotational span due to the inverted coordiante system logic. 
+    ## This is very important if the code is modified, but the current fanbeam function takes care of that.
+    ## The vector src_to_det_init defines the shift to the initial angle:
+    ## angle_partition = odl.uniform_partition(0,2*np.pi, 360) 
+    ## equals  rotations = range(0,stop=2*pi,length=360) .+ 2*pi*1/4+atan(src_to_det_init[2],src_to_det_init[1]) 
+    ## This is likely due to the flipped coordinate axis between ODL and this code.
 
     ## ODL's parameter det_axis_init=[1,-0.5] refers to extra rotation of the detector plate. That is,
-    ## det_axis_init=[3,-0.7] equals dextra_rot = atan(-0.7/3)*ones(Nproj,)
+    ## det_axis_init=[3,-0.7] equals dextra_rot = atan(-0.7,3)
 
-    ## Source and detector radiuses have the same logic.
+    ## Source and detector radii have the same logic.
 
     ## TODO: translations/shifts.
 
-        
-    #rotations=range(3/4*2*pi,stop=-pi/2,length=Nproj)#[3/4*2*pi + 0/6*pi,]
-    rotations=  range(0+pi,stop=2*pi+pi,length=Nproj)
-    #rotations = range(2*pi +pi,stop=0 +pi,length=Nproj)
+    Nx = 256; Ny = 256;  # Number of X and Y pixels,
+    Os = 6 # Splitting factor of the pixel quadtree.
+    Nproj = 360 # Number of projections i.e. no. angles
+    Nrays = 300 # Number of rays in a projection
 
-    dete_radius = 3.0
-    source_radius = 10.0
-    r = 1;
-    dete_plate_span = range(-8, stop = 4, length = Nrays)
-    dextra_rot = atan(-0.7/3)*ones(Nproj,)
-    rays = constructrays(Nrays,Nproj;center=cent,rotations=rotations,dete_radius=dete_radius,source_radius=source_radius,dextra_rot = dextra_rot, dete_plate_span=dete_plate_span)
+    odl_space = (min_pt=[-1.4, -2.0], max_pt=[3.6, 3.0]) 
+    src_to_det_init  =   ([1,5.5])
+    det_axis_init =  ([-1,1.3])
+    det_shift_func(angle) = [-1.5,0.7]      
+    rotations=  range(0,stop=2*pi,length=Nproj)
+    translation = [0.9,-0.5]
+
+    dete_radius = 5.7
+    source_radius = 5.0
+    dete_plate = range(-6, stop = 10, length = Nrays)
+
+    (qt,pixelvector)=setuppixels(Nx,Ny,Os;lowx=odl_space.min_pt[2],lowy=-odl_space.max_pt[1],widthx=abs(odl_space.max_pt[2]-odl_space.min_pt[2]),widthy=abs(odl_space.max_pt[1]-odl_space.min_pt[1]))  
+    rays = constructfanrays(Nrays,Nproj;translation=translation, src_to_det_init = src_to_det_init, det_axis_init=det_axis_init, det_shift_func=det_shift_func,apart=rotations,det_radius=dete_radius,src_radius=source_radius, dpart=dete_plate)
 
     #imshow(reshape(zn[:,1],256,256),extent=[-1,1,-1,1])
     #xlim([-5,5])
@@ -474,15 +505,14 @@ function test()
     figure()
     rad = reshape(yp,  Nrays,Nproj)
     println(size(rad))
-    #plot(rad)
     imshow(rad, aspect = "auto")
     title("Julia")
     # figure()
     # imshow(reshape(zn,256,256))
-    return rad,M
+    return rad,M,qt
 end
 
-y,M=test()
+y,M,qt=test()
 
 # Simple reconstruction.
 # figure()
@@ -494,7 +524,7 @@ y,M=test()
 
 #################################################################################
 
-# ## ODL code to compare 
+
 # import numpy as np
 # import odl
 # import scipy.io
@@ -506,16 +536,22 @@ y,M=test()
 # # Reconstruction space: discretized functions on the rectangle
 # # [-20, 20]^2 with 300 samples per dimension.
 # reco_space = odl.uniform_discr(
-#     min_pt=[-1, -1], max_pt=[1, 1], shape=[256, 256], dtype='float32')
+#     min_pt=[-1.4, -2], max_pt=[3.6, 3], shape=[256, 256], dtype='float32')
 
 
 # # Make a fan beam geometry with flat detector
 # # Angles: uniformly spaced, n = 360, min = 0, max = 2 * pi
 # angle_partition = odl.uniform_partition(0,2*np.pi, 360)
 # # Detector: uniformly sampled, n = 512, min = -30, max = 30
-# detector_partition = odl.uniform_partition(-8, 4, 300) # What is the coordinate system? det_axis_init=[1,-1]
-# #geometry = odl.tomo.FanFlatGeometry(angle_partition, detector_partition, src_radius=50, det_radius=np.sqrt(2),translation=[-0.5,-0.5])
-# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, det_axis_init=[3,-0.7], src_radius=10, det_radius=3, translation=[0,0])
+# detector_partition = odl.uniform_partition(-6, 10, 400) # What is the coordinate system? det_axis_init=[1,-1]
+# #geometry = odl.tomo.FanFlatGeometry(angle_partition, detector_partition, src_radius=50, det_radius=np.sqrt(2),translation=[-0.5,-0.5])det_axis_init=[3,-0.7],
+# # If the first param of the det_shift_func is constant, the effect is the same as increasing or decreasing the detector radius.
+# # Positive means decreasing the radius, negative decreasing. det_shift_func = lambda angle: [-1.5, 0.7],  det_axis_init=[1,1] det_axis_init=[-1,1.3],
+
+# #det_axis_init=[3,-0.7]
+# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, det_shift_func = lambda angle: [-1.5, 0.7], translation = [0.5,0.9], src_to_det_init=[1,5.5] , det_axis_init=[-1,1.3], src_radius=5, det_radius=5.7)
+# #geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition,  translation = [0.0,0.0],  src_radius=5, det_radius=5.7)
+
 
 # # Ray transform (= forward projection).
 # ray_trafo = odl.tomo.RayTransform(reco_space, geometry, impl='astra_cpu')
@@ -551,11 +587,11 @@ y,M=test()
 
 # # Back-projection can be done by simply calling the adjoint operator on the
 # # projection data (or any element in the projection space).
-# #backproj = ray_trafo.adjoint(proj_data)
+# backproj = ray_trafo.adjoint(proj_data)
 
 # # Shows a slice of the phantom, projections, and reconstruction
 
-# #plt.imshow(phantom)
+# #plt.imshow(backproj)
 # print(p.shape)
 # plt.figure()
 # plt.imshow(p,aspect = "auto")
