@@ -471,7 +471,7 @@ function test()
     Nx = 256; Ny = 256;  # Number of X and Y pixels,
     Os = 6 # Splitting factor of the pixel quadtree.
     Nproj = 360 # Number of projections i.e. no. angles
-    Nrays = 300 # Number of rays in a projection
+    Nrays = 400 # Number of rays in a projection
 
     odl_space = (min_pt=[-1.4, -2.0], max_pt=[3.6, 3.0]) 
     src_to_det_init  =   ([1,5.5])
