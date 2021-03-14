@@ -18,6 +18,6 @@ The fourth code,  _radon2Dpixel.jl_, uses pixels as finite-dimensional basis for
 - Statistics.jl
 - SparseArrays.jl
 - ProgressBars.jl
-- Images.jl (FileIO.jl ImageMagick.jl ImageIO.jl)
+- Images.jl (FileIO.jl, ImageMagick.jl and ImageIO.jl)
 
 

@@ -522,9 +522,11 @@ function test()
     return rad,M
 end
 
-sinogram,M=test2()
+sinogram,M=test()
 
 # Extremely simple reconstruction.
+# using Pkg
+# Pkg.add("RandomizedLinAlg")
 # using RandomizedLinAlg 
 # Q = rsvd(M, 500)
 # y = sinogram[:]
