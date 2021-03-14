@@ -6,7 +6,6 @@ using LinearAlgebra
 using SparseArrays
 using VectorizedRoutines
 using ProgressBars
-#using RandomizedLinAlg
 using MAT
 using Images
 
@@ -377,7 +376,7 @@ function constructfanrays(Nrays,Nproj;translation=[0,0.0],src_to_det_init=[0,1],
 
     sdinit = 2*pi*1/4+atan(src_to_det_init[2],src_to_det_init[1]) 
     apart = apart .+ sdinit
-
+    translation = [translation[2], -translation[1]]
     dextra_rot = 0.0
 
     if (det_axis_init === nothing)
@@ -391,42 +390,36 @@ function constructfanrays(Nrays,Nproj;translation=[0,0.0],src_to_det_init=[0,1],
 
     for i = 1:Nproj
         source = [cos(apart[i]), sin(apart[i])]*src_radius 
+        p2 = source + translation
         detcenter = -[cos(apart[i]), sin(apart[i])]*det_radius
         rays[i] = Vector{ray2d}(undef,Nrays)
-        # ps = zeros(2,2)
+        forplots = zeros(2,2)
         det_tangent = [-sin(apart[i]), cos(apart[i])]
         det_orth = [cos(apart[i]), sin(apart[i])]
         detshift = det_shift_func(apart[i])
         totcenter = detcenter - detshift[1]*det_orth - detshift[2]*det_tangent
         for j = 1:Nrays                    
             aux = [-sin(apart[i]+dextra_rot), cos(apart[i]+dextra_rot)]*span[j] + totcenter
-            #aux[1] = (aux[1] - totcenter[1])*cos(dextra_rot) - (aux[2] - totcenter[2])*sin(dextra_rot) + totcenter[1]
-            #aux[2] = (aux[2] - totcenter[2])*cos(dextra_rot) + (aux[1] - totcenter[1])*sin(dextra_rot) + totcenter[2]
-            p1 = aux + translation
-            p2 = source + translation
+            p1 = aux + translation         
             ray = ray2d(p1, p2)
             rays[i][j] = ray
 
             # if(j==1)
-            #     ps[1,:] = aux
+            #     forplots[1,:] = p1
             # elseif(j==Nrays)
-            #     ps[2,:] = aux
+            #     forplots[2,:] = p1
             # end
 
-            #plot([rays[i][j].origin[1], rays[i][j].origin[1] +  rays[i][j].dir[1]],[rays[i][j].origin[2], rays[i][j].origin[2] +  rays[i][j].dir[2]] )
-            #scatter(aux[1],aux[2])
+            # plot([rays[i][j].origin[1], rays[i][j].origin[1] +  rays[i][j].dir[1]],[rays[i][j].origin[2], rays[i][j].origin[2] +  rays[i][j].dir[2]] )
+            # scatter(aux[1],aux[2])
             
         end
-        # plot([rays[i][1].origin[1], rays[i][1].origin[1] +  rays[i][1].dir[1]],[rays[i][1].origin[2], rays[i][1].origin[2] +  rays[i][1].dir[2]] )
-        # plot([rays[i][end].origin[1], rays[i][end].origin[1] +  rays[i][end].dir[1]],[rays[i][end].origin[2], rays[i][end].origin[2] +  rays[i][end].dir[2]] )
-        
-        ###plot(-sin(apart[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[1] , cos(apart[i])*[span[1],span[end]]*(dsource_origo+ddetect_origo)/dsource_origo .+ totcenter[2]  )
-        # plot(ps[:,1],ps[:,2])
-        # scatter(source[1],source[2])
-        # scatter(totcenter[1],totcenter[2])
-        # println(norm((ps[1,:] - ps[2,:])) ,ps)
-        # #xlim([-9,9])
-        # #ylim([-9,9])
+        ## plot([rays[i][1].origin[1], rays[i][1].origin[1] +  rays[i][1].dir[1]],[rays[i][1].origin[2], rays[i][1].origin[2] +  rays[i][1].dir[2]] )
+        ## plot([rays[i][end].origin[1], rays[i][end].origin[1] +  rays[i][end].dir[1]],[rays[i][end].origin[2], rays[i][end].origin[2] +  rays[i][end].dir[2]] ) 
+        # plot(forplots[:,1],forplots[:,2])
+        # scatter(p2[1],p2[2])
+        # xlim([-9,9])
+        # ylim([-9,9])
         # axis(:equal)
      end
      #error("")
@@ -439,12 +432,12 @@ function test()
     close("all")
     
     #(qt,pixelvector)=setuppixels(Nx,Ny,Os)   # Default grid span is a rectangle with extents of [-1,-1] and [1,1].
-    #fn = "r.mat"
-    #file = matopen(fn)
+    # fn = "r.mat"
+    # file = matopen(fn)
     # zn = read(file, "S")
     # zn = zn[:,1]
 
-    fn = "kuvio.png"
+    fn = "simplephantom.png"
     zn = load(fn)
     zn = channelview(zn)
     zn = zn[:]
@@ -453,32 +446,46 @@ function test()
     ## When compared to ODL, the logic of the detector span is the same. The span vector should be increasing, so
     ## detector_partition = odl.uniform_partition(-8, 4, 100) equals dete_plate = range(-8, stop = 4, length = 100)
 
-    ## However, with the default angle settings in ODL,  π/2 radians plus a shift must be added  to obtain the same 
-    ## rotational span due to the inverted coordiante system logic. 
-    ## This is very important if the code is modified, but the current fanbeam function takes care of that.
+    ## However, with the coordinate axis are flipped in ODL. Depending on the case, π/2 radians plus a
+    ## possbile angle shift must be added to obtain the same 
+    ## rotational span due to the inverted coordinate system. 
+    ## This is very important if the code is modified, but the current fanbeam function takes care of the axis differences.
+
     ## The vector src_to_det_init defines the shift to the initial angle:
     ## angle_partition = odl.uniform_partition(0,2*np.pi, 360) 
-    ## equals  rotations = range(0,stop=2*pi,length=360) .+ 2*pi*1/4+atan(src_to_det_init[2],src_to_det_init[1]) 
-    ## This is likely due to the flipped coordinate axis between ODL and this code.
+    ## equals rotations = range(0,stop=2*pi,length=360) .+ 2*pi*1/4+atan(src_to_det_init[2],src_to_det_init[1]) 
+    ## Again, this extra angle is added due to the flipped coordinate axis between ODL and this code.
 
     ## ODL's parameter det_axis_init=[1,-0.5] refers to extra rotation of the detector plate. That is,
     ## det_axis_init=[3,-0.7] equals dextra_rot = atan(-0.7,3)
+    ## if the src_to_det_init is left to its default value. 
 
-    ## Source and detector radii have the same logic.
+    ## Source and detector radii have the same logic. 
+    ## By default, the center of rotation in ODL is the origin. The vector translation
+    ## moves it. This is just added to  initial points of the rays and the detector plate 
+    ## position vectors.
+    
+    ## The function det_shift_func defines a shift for the detector at each projection angle
+    ## in the parallel direction of the ray that goes through the COR and in the tangent direction of the ray.
+    ## For some reason, the src_shift_func does not work in ODL so it it not implemented in constructfanrays.
+    ## Likely it would be as straightforward to do as det_shift_func.
+    ## Curved detector plates are not also implemented.
 
-    ## TODO: translations/shifts.
+    ## The domain of the object is odl_space and its correspondence to ODL should be clear. Since Astra toolbox and ODL do not seem to support
+    ## anisotropic pixels together, the  number of pixels of the object and the geometry dimensions should be the same.
+
 
     Nx = 256; Ny = 256;  # Number of X and Y pixels,
-    Os = 6 # Splitting factor of the pixel quadtree.
+    Os = 6 # Splitting factor of the quadtree. Does not affect the theory matrix, only the performance of building it. 6 seems optimal for 256x256.
     Nproj = 360 # Number of projections i.e. no. angles
     Nrays = 400 # Number of rays in a projection
 
-    odl_space = (min_pt=[-1.4, -2.0], max_pt=[3.6, 3.0]) 
-    src_to_det_init  =   ([1,5.5])
-    det_axis_init =  ([-1,1.3])
-    det_shift_func(angle) = [-1.5,0.7]      
-    rotations=  range(0,stop=2*pi,length=Nproj)
-    translation = [0.9,-0.5]
+    odl_space = (min_pt=[-1.4, -2], max_pt=[3.6, 3]) 
+    src_to_det_init  = [1,5.5] #[0,1] is the default
+    det_axis_init =   [-1,1.3] #[1,0] is the default
+    det_shift_func(angle) = [-1.5, 0.4]   
+    rotations=  range(pi/3,stop=2*pi/3,length=Nproj)
+    translation = [0.5,0.9]
 
     dete_radius = 5.7
     source_radius = 5.0
@@ -495,6 +502,7 @@ function test()
     
     yp = M * zn
 
+    # For simulating a rotating object, but stationary device
     # Nlog = size(zn)[2]
     # rad = zeros(Nrays,Nlog)
     # for i = 1:Nlog
@@ -502,6 +510,7 @@ function test()
     #     yp = M * p
     #     rad[:,i] = yp
     # end
+
     figure()
     rad = reshape(yp,  Nrays,Nproj)
     println(size(rad))
@@ -509,21 +518,23 @@ function test()
     title("Julia")
     # figure()
     # imshow(reshape(zn,256,256))
-    return rad,M,qt
+    return rad,M
 end
 
-y,M,qt=test()
+sinogram,M=test()
 
-# Simple reconstruction.
-# figure()
-#Q = rsvd(M, 500)
+# Extremely simple reconstruction.
+# using RandomizedLinAlg 
+# Q = rsvd(M, 500)
+# y = sinogram[:]
 # x = (sparse(Q.Vt')*(spdiagm(0=>1.0./Q.S))*(sparse(Q.U')*y));
+# figure()
 # imshow(reshape(x,256,256))
 
 
 
 #################################################################################
-
+## ODL code for comparison
 
 # import numpy as np
 # import odl
@@ -533,71 +544,27 @@ y,M,qt=test()
 
 # plt.close("all")
 
-# # Reconstruction space: discretized functions on the rectangle
-# # [-20, 20]^2 with 300 samples per dimension.
-# reco_space = odl.uniform_discr(
-#     min_pt=[-1.4, -2], max_pt=[3.6, 3], shape=[256, 256], dtype='float32')
+# reco_space = odl.uniform_discr(min_pt=[-1.4, -2], max_pt=[3.6, 3], shape=[256, 256], dtype='float32')
 
-
-# # Make a fan beam geometry with flat detector
-# # Angles: uniformly spaced, n = 360, min = 0, max = 2 * pi
-# angle_partition = odl.uniform_partition(0,2*np.pi, 360)
-# # Detector: uniformly sampled, n = 512, min = -30, max = 30
-# detector_partition = odl.uniform_partition(-6, 10, 400) # What is the coordinate system? det_axis_init=[1,-1]
-# #geometry = odl.tomo.FanFlatGeometry(angle_partition, detector_partition, src_radius=50, det_radius=np.sqrt(2),translation=[-0.5,-0.5])det_axis_init=[3,-0.7],
+# angle_partition = odl.uniform_partition(np.pi/3,2*np.pi/3, 360)
+# detector_partition = odl.uniform_partition(-6, 10, 400) 
 # # If the first param of the det_shift_func is constant, the effect is the same as increasing or decreasing the detector radius.
-# # Positive means decreasing the radius, negative decreasing. det_shift_func = lambda angle: [-1.5, 0.7],  det_axis_init=[1,1] det_axis_init=[-1,1.3],
+# # Positive values mean decreasing the radius, negative values decrease it. 
 
-# #det_axis_init=[3,-0.7]
-# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, det_shift_func = lambda angle: [-1.5, 0.7], translation = [0.5,0.9], src_to_det_init=[1,5.5] , det_axis_init=[-1,1.3], src_radius=5, det_radius=5.7)
-# #geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition,  translation = [0.0,0.0],  src_radius=5, det_radius=5.7)
-
+# ds = lambda angle: np.array([[-1.5, 0.4]])
+# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, det_shift_func = ds, translation = [0.5,0.9], src_to_det_init=[1,5.5] , det_axis_init=[-1,1.3], src_radius=5, det_radius=5.7)
 
 # # Ray transform (= forward projection).
 # ray_trafo = odl.tomo.RayTransform(reco_space, geometry, impl='astra_cpu')
 
-# # Create a discrete Shepp-Logan phantom (modified version)
-# # mat = scipy.io.loadmat('r.mat')
-# # M = mat['S']
-# # mat = M[:,0]
-# # phantom = np.reshape(mat,(256,256)).T
-# # proj_data = ray_trafo(phantom)
-# # p = proj_data.data.T
-
-# mat = Image.open("kuvio.png").convert('L')
-# # wpercent = (Nimage / float(mat.size[0]))
-# # size = int((float(mat.size[1]) * float(wpercent)))
-# # mat = mat.resize((size, size), Image.ANTIALIAS)
+# mat = Image.open("simplephantom.png").convert('L')
 # phantom = np.array(mat)/255.0
 # proj_data = ray_trafo(phantom)
 # p = proj_data.data.T
 
-# # A = np.zeros((512,360))
-# # for i in range(360):
-# #     mat = M[:,i]
-# #     phantom = np.reshape(mat,(256,256)).T
-# #     proj_data = ray_trafo(phantom)
-# #     p = proj_data.data
-# #     A[:,i] = p
-# #phantom = odl.phantom.shepp_logan(reco_space, modified=True)
-# #phantom=odl.phantom()
-
-# # Create projection data by calling the ray transform on the phantom
-# #proj_data = ray_trafo(phantom)
-
-# # Back-projection can be done by simply calling the adjoint operator on the
-# # projection data (or any element in the projection space).
-# backproj = ray_trafo.adjoint(proj_data)
-
-# # Shows a slice of the phantom, projections, and reconstruction
-
-# #plt.imshow(backproj)
 # print(p.shape)
 # plt.figure()
 # plt.imshow(p,aspect = "auto")
 # plt.title("ODL")
 # #plt.plot(p)
 # plt.show()
-# #proj_data.show(title='Projection Data (sinogram)',force_show=True)
-# #backproj.show(title='Back-projection', force_show=True)
-
