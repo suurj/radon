@@ -5,6 +5,7 @@ using Statistics
 using LinearAlgebra
 using SparseArrays
 using VectorizedRoutines
+using ProgressBars
 using MAT
 
 struct segment3d{T}
@@ -310,7 +311,12 @@ function constructmatrix(
     end
 
     t = time()
-    for a = 1:Na
+    if (Na > 1)
+        pb = ProgressBar(1:Na)
+    else
+        pb = 1:1
+    end
+    for a in pb
         pl = planevector[a]
         Threads.@threads for j = 1:N
             #for j = 1:N

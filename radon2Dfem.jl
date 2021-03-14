@@ -5,6 +5,7 @@ using Statistics
 using LinearAlgebra
 using SparseArrays
 using VectorizedRoutines
+using ProgressBars
 using MAT
 
 struct triangle2d
@@ -196,7 +197,12 @@ function constructmatrix(tree::Cell, vv::Vector{triangle2d}, N::Int64, theta)
     end
 
     t = time()
-    for a = 1:Na
+    if (Na > 1)
+        pb = ProgressBar(1:Na)
+    else
+        pb = 1:1
+    end
+    for a in pb
         dir = [cos(theta[a]), sin(theta[a])]
         aux = [-sin(theta[a]), cos(theta[a])]
         Threads.@threads for i = 1:N
@@ -360,4 +366,4 @@ function test()
     return nothing
 end
 
-#test()
+test()

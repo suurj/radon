@@ -5,6 +5,7 @@ using Statistics
 using LinearAlgebra
 using SparseArrays
 using VectorizedRoutines
+using ProgressBars
 using MAT
 
 
@@ -235,7 +236,12 @@ function constructmatrix(
     end
 
     t = time()
-    for a = 1:Na
+    if (Na > 1)
+        pb = ProgressBar(1:Na)
+    else
+        pb = 1:1
+    end
+    for a in pb
         x1 = r * sin(theta[a]) * cos(fii[a])
         y1 = r * sin(theta[a]) * sin(fii[a])
         z1 = r * cos(theta[a])
