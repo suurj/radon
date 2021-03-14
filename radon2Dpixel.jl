@@ -417,12 +417,13 @@ function constructfanrays(Nrays,Nproj;translation=[0,0.0],src_to_det_init=[0,1],
         ## plot([rays[i][1].origin[1], rays[i][1].origin[1] +  rays[i][1].dir[1]],[rays[i][1].origin[2], rays[i][1].origin[2] +  rays[i][1].dir[2]] )
         ## plot([rays[i][end].origin[1], rays[i][end].origin[1] +  rays[i][end].dir[1]],[rays[i][end].origin[2], rays[i][end].origin[2] +  rays[i][end].dir[2]] ) 
         # plot(forplots[:,1],forplots[:,2])
+        # println(forplots)
         # scatter(p2[1],p2[2])
         # xlim([-9,9])
         # ylim([-9,9])
         # axis(:equal)
      end
-     #error("")
+    #  error("")
     return rays
 end
 
@@ -521,7 +522,7 @@ function test()
     return rad,M
 end
 
-sinogram,M=test()
+sinogram,M=test2()
 
 # Extremely simple reconstruction.
 # using RandomizedLinAlg 
