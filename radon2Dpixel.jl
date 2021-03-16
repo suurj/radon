@@ -368,7 +368,7 @@ function constructparallelrays(Nrays,Nproj;rotations=range(-pi/2,stop=3/4*2*pi,l
 
 end
 
-function constructfanrays(Nrays,Nproj;translation=[0,0.0],src_to_det_init=[0,1],det_axis_init = nothing,det_shift_func=a->[0,0.0],apart=range(0,stop=pi,length=Nproj),det_radius=sqrt(2),src_radius=sqrt(2),dpart=range(-sqrt(2), stop = sqrt(2), length = Nrays))
+function constructfanrays(Nrays,Nproj;src_shift_func = a->[0,0.0],translation=[0,0.0],src_to_det_init=[0,1],det_axis_init = nothing,det_shift_func=a->[0,0.0],apart=range(0,stop=pi,length=Nproj),det_radius=sqrt(2),src_radius=sqrt(2),dpart=range(-sqrt(2), stop = sqrt(2), length = Nrays))
 
     @assert length(dpart) == Nrays
     @assert length(apart) == Nproj
@@ -389,15 +389,22 @@ function constructfanrays(Nrays,Nproj;translation=[0,0.0],src_to_det_init=[0,1],
     span = dpart
 
     for i = 1:Nproj
-        source = [cos(apart[i]), sin(apart[i])]*src_radius 
-        p2 = source + translation
-        detcenter = -[cos(apart[i]), sin(apart[i])]*det_radius
+
         rays[i] = Vector{ray2d}(undef,Nrays)
         forplots = zeros(2,2)
+
+        src_tangent = [-sin(apart[i]), cos(apart[i])]
+        src_orth = [cos(apart[i]), sin(apart[i])]
+        srcshift = src_shift_func(apart[i])
+        source = [cos(apart[i]), sin(apart[i])]*src_radius + srcshift[1]*src_orth + srcshift[2]*src_tangent     
+        p2 = source + translation
+
+        detcenter = -[cos(apart[i]), sin(apart[i])]*det_radius  
         det_tangent = [-sin(apart[i]), cos(apart[i])]
         det_orth = [cos(apart[i]), sin(apart[i])]
         detshift = det_shift_func(apart[i])
         totcenter = detcenter - detshift[1]*det_orth - detshift[2]*det_tangent
+
         for j = 1:Nrays                    
             aux = [-sin(apart[i]+dextra_rot), cos(apart[i]+dextra_rot)]*span[j] + totcenter
             p1 = aux + translation         
@@ -468,9 +475,10 @@ function test()
     
     ## The function det_shift_func defines a shift for the detector at each projection angle
     ## in the parallel direction of the ray that goes through the COR and in the tangent direction of the ray.
-    ## For some reason, the src_shift_func does not work in ODL so it it not implemented in constructfanrays.
-    ## Likely it would be as straightforward to do as det_shift_func.
-    ## Curved detector plates are not also implemented.
+    ## Function src_shift_func works also. It work in the same manner as det_shift_func, it just determines a shift for the source.
+    ## Finally, having non-constant shift functions do not seem to behave properly in ODL. Perhaps there is a bug in ODL?
+
+    ## Curved detector plates are not implemented.
 
     ## The domain of the object is odl_space and its correspondence to ODL should be clear. Since Astra toolbox and ODL do not seem to support
     ## anisotropic pixels together, the  number of pixels of the object and the geometry dimensions should be the same.
@@ -485,6 +493,7 @@ function test()
     src_to_det_init  = [1,5.5] #[0,1] is the default
     det_axis_init =   [-1,1.3] #[1,0] is the default
     det_shift_func(angle) = [-1.5, 0.4]   
+    src_shift_func(angle) = [0.7,1.5]   
     rotations=  range(pi/3,stop=2*pi/3,length=Nproj)
     translation = [0.5,0.9]
 
@@ -493,7 +502,7 @@ function test()
     dete_plate = range(-6, stop = 10, length = Nrays)
 
     (qt,pixelvector)=setuppixels(Nx,Ny,Os;lowx=odl_space.min_pt[2],lowy=-odl_space.max_pt[1],widthx=abs(odl_space.max_pt[2]-odl_space.min_pt[2]),widthy=abs(odl_space.max_pt[1]-odl_space.min_pt[1]))  
-    rays = constructfanrays(Nrays,Nproj;translation=translation, src_to_det_init = src_to_det_init, det_axis_init=det_axis_init, det_shift_func=det_shift_func,apart=rotations,det_radius=dete_radius,src_radius=source_radius, dpart=dete_plate)
+    rays = constructfanrays(Nrays,Nproj;translation=translation, src_shift_func=src_shift_func, src_to_det_init = src_to_det_init, det_axis_init=det_axis_init, det_shift_func=det_shift_func,apart=rotations,det_radius=dete_radius,src_radius=source_radius, dpart=dete_plate)
 
     #imshow(reshape(zn[:,1],256,256),extent=[-1,1,-1,1])
     #xlim([-5,5])
@@ -554,8 +563,9 @@ sinogram,M=test()
 # # If the first param of the det_shift_func is constant, the effect is the same as increasing or decreasing the detector radius.
 # # Positive values mean decreasing the radius, negative values decrease it. 
 
-# ds = lambda angle: np.array([[-1.5, 0.4]])
-# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, det_shift_func = ds, translation = [0.5,0.9], src_to_det_init=[1,5.5] , det_axis_init=[-1,1.3], src_radius=5, det_radius=5.7)
+# dsfun = lambda angle: np.array([[-1.5, 0.4]])
+# ssfun = lambda angle: np.array([[0.7, 1.5]])
+# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, src_shift_func=ss,  det_shift_func = ds, translation = [0.5,0.9], src_to_det_init=[1,5.5] , det_axis_init=[-1,1.3], src_radius=5, det_radius=5.7)
 
 # # Ray transform (= forward projection).
 # ray_trafo = odl.tomo.RayTransform(reco_space, geometry, impl='astra_cpu')
@@ -571,3 +581,4 @@ sinogram,M=test()
 # plt.title("ODL")
 # #plt.plot(p)
 # plt.show()
+
