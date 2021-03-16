@@ -563,9 +563,9 @@ sinogram,M=test()
 # # If the first param of the det_shift_func is constant, the effect is the same as increasing or decreasing the detector radius.
 # # Positive values mean decreasing the radius, negative values decrease it. 
 
-# dsfun = lambda angle: np.array([[-1.5, 0.4]])
+# dsfun = lambda angle:  np.array([[-1.5, 0.4]])
 # ssfun = lambda angle: np.array([[0.7, 1.5]])
-# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, src_shift_func=ss,  det_shift_func = ds, translation = [0.5,0.9], src_to_det_init=[1,5.5] , det_axis_init=[-1,1.3], src_radius=5, det_radius=5.7)
+# geometry = odl.tomo.geometry.conebeam.FanBeamGeometry(angle_partition, detector_partition, src_shift_func=ssfun,  det_shift_func = dsfun, translation = [0.5,0.9], src_to_det_init=[1,5.5] , det_axis_init=[-1,1.3], src_radius=5, det_radius=5.7)
 
 # # Ray transform (= forward projection).
 # ray_trafo = odl.tomo.RayTransform(reco_space, geometry, impl='astra_cpu')
